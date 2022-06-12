@@ -3,32 +3,62 @@ const normalizeText = (text) => text.match(/\w+/g);
 const calculateOccurrences = (terms, term) => terms
   .reduce((acc, value) => (value === term ? acc + 1 : acc), 0);
 
-const search = (docs, words) => docs
-  .map(({ id, text }) => ({ id, terms: normalizeText(text) }))
-  .map(({ id, terms }) => {
-    const countWords = words.reduce((acc, w) => (terms.includes(w) ? acc + 1 : acc), 0);
-    const occurrences = words.reduce((acc, w) => acc + calculateOccurrences(terms, w), 0);
-    return {
-      id,
-      terms,
-      countWords,
-      occurrences,
-    };
-  })
-  .filter((d) => d.occurrences)
-  .sort((a, b) => {
-    if (a.countWords > b.countWords) {
-      return -1;
-    }
+const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
-    if (a.countWords < b.countWords) {
-      return 1;
+const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
+  terms.forEach((term) => {
+    if (acc[term] && !acc[term].includes(id)) {
+      acc[term].push(id);
+    } else {
+      acc[term] = [id];
     }
+  });
 
-    return b.occurrences - a.occurrences;
-  })
-  .map((d) => d.id);
+  return acc;
+}, {});
+
+const searchDocs = (docs, words) => {
+  const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
+
+  const index = createIndex(normalizedDocs);
+  const invertedIndex = createInvertedIndex(normalizedDocs);
+
+  return words.flatMap((word) => (invertedIndex[word] || [])
+    .map((docId) => {
+      const { id, terms } = index[docId];
+
+      const countWords = words.reduce((acc, w) => (terms.includes(w) ? acc + 1 : acc), 0);
+      const occurrences = words.reduce((acc, w) => acc + calculateOccurrences(terms, w), 0);
+      return {
+        id,
+        terms,
+        countWords,
+        occurrences,
+      };
+    })
+    .filter((d) => d.occurrences)
+    .sort((doc1, doc2) => {
+      if (doc1.countWords > doc2.countWords) {
+        return -1;
+      }
+
+      if (doc1.countWords < doc2.countWords) {
+        return 1;
+      }
+
+      return doc2.occurrences - doc1.occurrences;
+    })
+    .map((d) => d.id));
+};
 
 export default (docs) => ({
-  search: (value) => search(docs, normalizeText(value)),
+  search: (value) => {
+    const words = normalizeText(value);
+
+    if (words === null) {
+      return docs.map((d) => d.id);
+    }
+
+    return searchDocs(docs, words);
+  },
 });
