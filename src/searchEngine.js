@@ -1,64 +1,63 @@
-const normalizeText = (text) => text.match(/\w+/g);
-
-const calculateOccurrences = (terms, term) => terms
-  .reduce((acc, value) => (value === term ? acc + 1 : acc), 0);
+const normalizeText = (text) => text.match(/\w+/g) || [];
 
 const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
 const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
   terms.forEach((term) => {
-    if (acc[term] && !acc[term].includes(id)) {
-      acc[term].push(id);
+    if (!acc[term]) {
+      acc[term] = [{ docId: id, occurrences: 1 }];
+      return;
+    }
+
+    const currentDoc = acc[term].find(({ docId }) => docId === id);
+    if (currentDoc) {
+      currentDoc.occurrences += 1;
     } else {
-      acc[term] = [id];
+      acc[term].push({ docId: id, occurrences: 1 });
     }
   });
 
   return acc;
 }, {});
 
-const searchDocs = (docs, words) => {
-  const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
+const createTfIdf = (docs, mappingDocumentsById, invertedIndex) => {
+  const newInvertedIndex = invertedIndex;
 
-  const index = createIndex(normalizedDocs);
-  const invertedIndex = createInvertedIndex(normalizedDocs);
+  Object.entries(invertedIndex).forEach(([word, docsInfo]) => {
+    (docsInfo || []).forEach(({ docId, occurrences }, i) => {
+      const doc = mappingDocumentsById[docId];
+      const tf = occurrences / doc.terms.length;
+      const idf = Math.log10(docs.length / docsInfo.length);
 
-  return words.flatMap((word) => (invertedIndex[word] || [])
-    .map((docId) => {
-      const { id, terms } = index[docId];
-
-      const countWords = words.reduce((acc, w) => (terms.includes(w) ? acc + 1 : acc), 0);
-      const occurrences = words.reduce((acc, w) => acc + calculateOccurrences(terms, w), 0);
-      return {
-        id,
-        terms,
-        countWords,
-        occurrences,
-      };
-    })
-    .filter((d) => d.occurrences)
-    .sort((doc1, doc2) => {
-      if (doc1.countWords > doc2.countWords) {
-        return -1;
-      }
-
-      if (doc1.countWords < doc2.countWords) {
-        return 1;
-      }
-
-      return doc2.occurrences - doc1.occurrences;
-    })
-    .map((d) => d.id));
+      newInvertedIndex[word][i].metric = tf * idf;
+    });
+  });
 };
 
-export default (docs) => ({
-  search: (value) => {
+export default (docs) => {
+  const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
+
+  const mappingDocumentsById = createIndex(normalizedDocs);
+  const invertedIndex = createInvertedIndex(normalizedDocs);
+
+  createTfIdf(docs, mappingDocumentsById, invertedIndex);
+
+  const search = (value) => {
     const words = normalizeText(value);
 
-    if (words === null) {
-      return docs.map((d) => d.id);
-    }
+    const relevantDocuments = words.reduce((acc, word) => {
+      const documentsWithWord = invertedIndex[word] || [];
 
-    return searchDocs(docs, words);
-  },
-});
+      return documentsWithWord.reduce((outerAcc, { docId, metric }) => (
+        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + metric }
+      ), acc);
+    }, {});
+
+    return Object
+      .entries(relevantDocuments)
+      .sort(([, metric1], [, metric2]) => metric2 - metric1)
+      .map(([id]) => id);
+  };
+
+  return ({ search });
+};
