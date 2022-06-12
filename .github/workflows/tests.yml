@@ -2,7 +2,7 @@
 
 
 # Name of workflow
-name: Node CI
+name: tests
 
 # Trigger the workflow on push or pull request
 on:
