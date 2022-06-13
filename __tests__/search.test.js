@@ -1,37 +1,23 @@
 import { test, expect } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
 import buildSearchEngine from '..';
 
 let docs;
 
+const resolvePath = (name) => path.resolve('__fixtures__', name);
+
 beforeAll(() => {
-  const doc1 = { id: 'doc1', text: "I can't shoot shoot straight unless I've had a pint!" };
-  const doc2 = { id: 'doc2', text: "Don't shoot shoot that thing at me." };
-  const doc3 = { id: 'doc3', text: "I'm your shooter." };
+  const doc1 = { id: 'garbage_patch_NG', text: fs.readFileSync(resolvePath('garbage_patch_NG'), 'utf8') };
+  const doc2 = { id: 'garbage_patch_ocean_clean', text: fs.readFileSync(resolvePath('garbage_patch_ocean_clean'), 'utf8') };
+  // const doc3 = { id: 'garbage_patch_spam', text: fs.readFileSync(resolvePath('garbage_patch_spam'), 'utf8') };
+  const doc4 = { id: 'garbage_patch_wiki', text: fs.readFileSync(resolvePath('garbage_patch_wiki'), 'utf8') };
 
-  docs = [doc1, doc2, doc3];
+  docs = [doc1, doc2, doc4];
 });
 
-test('clear search', () => {
+test('simple search', () => {
   const searchEngine = buildSearchEngine(docs);
-  expect(searchEngine.search('shoot')).toEqual(expect.arrayContaining(['doc1', 'doc2']));
-  expect(searchEngine.search('hobbit')).toHaveLength(0);
-
-  const searchEngine2 = buildSearchEngine([]);
-  expect(searchEngine2.search('')).toHaveLength(0);
-});
-
-test('relevancy', () => {
-  const searchEngine = buildSearchEngine(docs);
-  const result = searchEngine.search('shoot');
-
-  expect(result[0]).toBe('doc2');
-  expect(result[1]).toBe('doc1');
-});
-
-test('fuzzy search', () => {
-  const searchEngine = buildSearchEngine(docs);
-  const result = searchEngine.search('shoot at me');
-
-  expect(result[0]).toBe('doc2');
-  expect(result[1]).toBe('doc1');
+  const expected = ['garbage_patch_NG', 'garbage_patch_ocean_clean', 'garbage_patch_wiki'];
+  expect(searchEngine.search('trash island')).toEqual(expected);
 });

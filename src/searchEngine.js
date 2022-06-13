@@ -1,4 +1,4 @@
-const normalizeText = (text) => text.match(/\w+/g) || [];
+const normalizeText = (text) => text.match(/\w+/g).map((term) => term.toLowerCase()) || [];
 const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
 const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
@@ -20,22 +20,20 @@ const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
 }, {});
 
 const createTfIdf = (docs, mappingDocumentsById, invertedIndex) => {
-  const newInvertedIndex = invertedIndex;
+  Object.values(invertedIndex).forEach((docsInfo) => {
+    const newDocsInfo = docsInfo;
 
-  Object.entries(invertedIndex).forEach(([word, docsInfo]) => {
-    (docsInfo || []).forEach(({ docId, occurrences }, i) => {
+    newDocsInfo.forEach(({ docId, occurrences }, i) => {
       const doc = mappingDocumentsById[docId];
       const tf = occurrences / doc.terms.length;
-      const idf = Math.log10(docs.length / docsInfo.length);
+      const idf = Math.log(1.0 + docs.length / newDocsInfo.length);
 
-      newInvertedIndex[word][i].metric = tf * idf;
+      newDocsInfo[i].metric = tf * idf;
     });
   });
 };
 
 export default (docs) => {
-  console.log(docs);
-
   const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
 
   const mappingDocumentsById = createIndex(normalizedDocs);
@@ -43,17 +41,25 @@ export default (docs) => {
 
   createTfIdf(docs, mappingDocumentsById, invertedIndex);
 
+  console.log(invertedIndex);
+
   const search = (value) => {
-    console.log(value);
     const words = normalizeText(value);
 
     const relevantDocuments = words.reduce((acc, word) => {
       const documentsWithWord = invertedIndex[word] || [];
 
-      return documentsWithWord.reduce((outerAcc, { docId, occurrences, metric }) => (
-        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + occurrences * metric }
-      ), acc);
+      return documentsWithWord.reduce((outerAcc, { docId, metric }) => {
+        const prevScore = outerAcc[docId] ?? 0;
+        const score = metric;
+
+        return (
+          { ...outerAcc, [docId]: prevScore + score }
+        );
+      }, acc);
     }, {});
+
+    console.log(relevantDocuments);
 
     return Object
       .entries(relevantDocuments)
