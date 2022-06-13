@@ -1,5 +1,4 @@
 const normalizeText = (text) => text.match(/\w+/g) || [];
-
 const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
 const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
