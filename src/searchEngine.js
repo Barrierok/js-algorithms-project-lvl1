@@ -1,4 +1,4 @@
-const normalizeText = (text) => text.match(/\w+/g).map((term) => term.toLowerCase()) || [];
+const normalizeText = (text) => (text.match(/\w+/g) || []).map((term) => term.toLowerCase());
 const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
 const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
@@ -34,6 +34,7 @@ const createTfIdf = (docs, mappingDocumentsById, invertedIndex) => {
 };
 
 export default (docs) => {
+  console.log(docs);
   const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
 
   const mappingDocumentsById = createIndex(normalizedDocs);
@@ -41,25 +42,17 @@ export default (docs) => {
 
   createTfIdf(docs, mappingDocumentsById, invertedIndex);
 
-  console.log(invertedIndex);
-
   const search = (value) => {
+    console.log(value);
     const words = normalizeText(value);
 
     const relevantDocuments = words.reduce((acc, word) => {
       const documentsWithWord = invertedIndex[word] || [];
 
-      return documentsWithWord.reduce((outerAcc, { docId, metric }) => {
-        const prevScore = outerAcc[docId] ?? 0;
-        const score = metric;
-
-        return (
-          { ...outerAcc, [docId]: prevScore + score }
-        );
-      }, acc);
+      return documentsWithWord.reduce((outerAcc, { docId, metric }) => (
+        { ...outerAcc, [docId]: outerAcc[docId] ?? 0 + metric }
+      ), acc);
     }, {});
-
-    console.log(relevantDocuments);
 
     return Object
       .entries(relevantDocuments)
