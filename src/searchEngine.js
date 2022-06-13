@@ -34,6 +34,8 @@ const createTfIdf = (docs, mappingDocumentsById, invertedIndex) => {
 };
 
 export default (docs) => {
+  console.log(docs);
+
   const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
 
   const mappingDocumentsById = createIndex(normalizedDocs);
@@ -42,13 +44,14 @@ export default (docs) => {
   createTfIdf(docs, mappingDocumentsById, invertedIndex);
 
   const search = (value) => {
+    console.log(value);
     const words = normalizeText(value);
 
     const relevantDocuments = words.reduce((acc, word) => {
       const documentsWithWord = invertedIndex[word] || [];
 
-      return documentsWithWord.reduce((outerAcc, { docId, metric }) => (
-        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + metric }
+      return documentsWithWord.reduce((outerAcc, { docId, occurrences, metric }) => (
+        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + occurrences * metric }
       ), acc);
     }, {});
 
