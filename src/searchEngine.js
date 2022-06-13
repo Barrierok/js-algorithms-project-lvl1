@@ -50,7 +50,7 @@ export default (docs) => {
       const documentsWithWord = invertedIndex[word] || [];
 
       return documentsWithWord.reduce((outerAcc, { docId, metric }) => (
-        { ...outerAcc, [docId]: outerAcc[docId] ?? 0 + metric }
+        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + metric }
       ), acc);
     }, {});
 
