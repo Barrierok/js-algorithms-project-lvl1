@@ -10,9 +10,9 @@ const resolvePath = (name) => path.resolve('__fixtures__', name);
 beforeAll(() => {
   const doc1 = { id: 'garbage_patch_NG', text: fs.readFileSync(resolvePath('garbage_patch_NG'), 'utf8') };
   const doc2 = { id: 'garbage_patch_ocean_clean', text: fs.readFileSync(resolvePath('garbage_patch_ocean_clean'), 'utf8') };
-  const doc4 = { id: 'garbage_patch_wiki', text: fs.readFileSync(resolvePath('garbage_patch_wiki'), 'utf8') };
+  const doc3 = { id: 'garbage_patch_wiki', text: fs.readFileSync(resolvePath('garbage_patch_wiki'), 'utf8') };
 
-  docs = [doc1, doc2, doc4];
+  docs = [doc1, doc2, doc3];
 });
 
 test('simple search', () => {

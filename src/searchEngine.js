@@ -1,62 +1,43 @@
+import _ from 'lodash';
+
 const normalizeText = (text) => (text.match(/\w+/g) || []).map((term) => term.toLowerCase());
-const createIndex = (docs) => docs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
-const createInvertedIndex = (docs) => docs.reduce((acc, { id, terms }) => {
-  terms.forEach((term) => {
-    if (!acc[term]) {
-      acc[term] = [{ docId: id, occurrences: 1 }];
-      return;
-    }
+const createInvertedIndexWithMetrics = (rawDocs) => {
+  const termDocs = rawDocs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
+  const mappingDocumentsById = termDocs.reduce((acc, doc) => ({ ...acc, [doc.id]: doc }), {});
 
-    const currentDoc = acc[term].find(({ docId }) => docId === id);
-    if (currentDoc) {
-      currentDoc.occurrences += 1;
-    } else {
-      acc[term].push({ docId: id, occurrences: 1 });
-    }
-  });
+  const invertedIndex = termDocs.reduce((acc, doc) => {
+    const occurrences = _.countBy(doc.terms);
 
-  return acc;
-}, {});
+    return _.mergeWith(acc, occurrences, (objValue, srcValue) => (
+      (objValue || []).concat({ docId: doc.id, occurrences: srcValue })
+    ));
+  }, {});
 
-const createTfIdf = (docs, mappingDocumentsById, invertedIndex) => {
-  Object.values(invertedIndex).forEach((docsInfo) => {
-    const newDocsInfo = docsInfo;
+  return _.mapValues(invertedIndex, (docsInfo) => docsInfo.map(({ docId, occurrences }) => {
+    const doc = mappingDocumentsById[docId];
+    const tf = occurrences / doc.terms.length;
+    const idf = Math.log(1 + termDocs.length / docsInfo.length);
 
-    newDocsInfo.forEach(({ docId, occurrences }, i) => {
-      const doc = mappingDocumentsById[docId];
-      const tf = occurrences / doc.terms.length;
-      const idf = Math.log(1.0 + docs.length / newDocsInfo.length);
-
-      newDocsInfo[i].metric = tf * idf;
-    });
-  });
+    return { docId, tfIdf: tf * idf };
+  }));
 };
 
 export default (docs) => {
-  console.log(docs);
-  const normalizedDocs = docs.map(({ id, text }) => ({ id, terms: normalizeText(text) }));
-
-  const mappingDocumentsById = createIndex(normalizedDocs);
-  const invertedIndex = createInvertedIndex(normalizedDocs);
-
-  createTfIdf(docs, mappingDocumentsById, invertedIndex);
+  const invertedIndexWithMetrics = createInvertedIndexWithMetrics(docs);
 
   const search = (value) => {
-    console.log(value);
     const words = normalizeText(value);
 
-    const relevantDocuments = words.reduce((acc, word) => {
-      const documentsWithWord = invertedIndex[word] || [];
-
-      return documentsWithWord.reduce((outerAcc, { docId, metric }) => (
-        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + metric }
-      ), acc);
-    }, {});
+    const relevantDocuments = words.reduce((acc, word) => (
+      (invertedIndexWithMetrics[word] || []).reduce((outerAcc, { docId, tfIdf }) => (
+        { ...outerAcc, [docId]: (outerAcc[docId] ?? 0) + tfIdf }
+      ), acc)
+    ), {});
 
     return Object
       .entries(relevantDocuments)
-      .sort(([, metric1], [, metric2]) => metric2 - metric1)
+      .sort(([, tfIdf1], [, tfIdf2]) => tfIdf2 - tfIdf1)
       .map(([id]) => id);
   };
 
