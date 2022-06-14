@@ -1,3 +1,3 @@
-import buildSearchEngine from './src/index.js';
+import buildSearchEngine from './src/searchEngine';
 
 export default buildSearchEngine;
